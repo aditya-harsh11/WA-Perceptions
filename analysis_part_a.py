@@ -5,6 +5,7 @@ import os
 import glob
 import csv
 from matplotlib.animation import FuncAnimation
+from PIL import Image
 
 def main():
     # Load bbox data
@@ -193,6 +194,8 @@ def main():
         
         def update(frame):
             # frame is index
+            if frame % 10 == 0:
+                print(f"Update frame {frame}")
             line.set_data(car_x[:frame+1], car_y[:frame+1])
             point.set_data([car_x[frame]], [car_y[frame]]) 
             return line, point,
@@ -204,8 +207,68 @@ def main():
     except Exception as e:
         print(f"Warning: Could not save mp4. {e}")
         try:
-            ani.save('trajectory.gif', writer='pillow', fps=20)
-            print("Saved trajectory.gif instead")
+            plt.close(fig) # Close old figure
+            
+            # Use explicit Agg backend to guarantee off-screen rendering
+            from matplotlib.figure import Figure
+            from matplotlib.backends.backend_agg import FigureCanvasAgg
+            
+            fig = Figure(figsize=(10, 10))
+            canvas = FigureCanvasAgg(fig)
+            ax = fig.add_subplot(111)
+            
+            print("Starting manual GIF generation with FigureCanvasAgg (Brute Force)...")
+            frames_img = []
+            
+            # Pre-calculate limits
+            all_x = np.concatenate([car_x, [0]])
+            all_y = np.concatenate([car_y, [0]])
+            xlims = (np.min(all_x) - 5, np.max(all_x) + 5)
+            ylims = (np.min(all_y) - 5, np.max(all_y) + 5)
+
+            for f in range(len(car_x)):
+                if f % 50 == 0:
+                    print(f"Rendering frame {f}/{len(car_x)}")
+                
+                ax.clear()
+                ax.set_xlim(xlims)
+                ax.set_ylim(ylims)
+                ax.set_xlabel('World X (m)')
+                ax.set_ylabel('World Y (m)')
+                ax.set_title('Ego-Vehicle BEV Trajectory')
+                ax.grid(True)
+                ax.set_aspect('equal')
+                
+                # Re-plot
+                ax.plot(car_x[:f+1], car_y[:f+1], 'b-', lw=2)
+                ax.plot([car_x[f]], [car_y[f]], 'bo')
+                ax.plot([0], [0], 'r*', markersize=15)
+                
+                # Redraw
+                canvas.draw()
+                
+                # Convert canvas to image
+                img = np.asarray(canvas.buffer_rgba()).copy()
+                img = Image.fromarray(img)
+                
+                frames_img.append(img)
+            
+            if frames_img:
+                frames_img[0].save(
+                    'trajectory.gif',
+                    save_all=True,
+                    append_images=frames_img[1:],
+                    duration=50, # 50ms per frame = 20fps
+                    loop=0
+                )
+                print(f"Saved trajectory.gif with {len(frames_img)} frames manually.")
+            else:
+                 print("Error: No frames generated.")
+
+        except Exception as e2:
+            print(f"Error saving gif: {e2}")
+            import traceback
+            traceback.print_exc()
         except Exception as e2:
             print(f"Error saving gif: {e2}")
 

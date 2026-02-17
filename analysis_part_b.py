@@ -6,6 +6,7 @@ import glob
 import csv
 from matplotlib.animation import FuncAnimation
 import matplotlib.image as mpimg
+from PIL import Image
 
 def main():
     # Load bbox data (still need light for reference frame)
@@ -243,104 +244,90 @@ def main():
              cart_world_x.append(np.nan)
              cart_world_y.append(np.nan)
              
-    # --- Visualization ---
-
-    print("Generating Part B visualization...")
+    # --- Visualization (World Frame) ---
+    print("Generating Part B visualization (World Frame)...")
     
-    # 1. Static Plot (Accumulated)
+    # 1. Static Plot (World Frame)
     plt.figure(figsize=(12, 12))
     plt.plot(car_x, car_y, label='Ego Trajectory', color='blue')
     plt.scatter([0], [0], color='red', marker='*', s=300, label='Traffic Light (Origin)')
     
-    # Scatter all barrels
-    # Downsample barrels for plot clarity
     if len(barrels_world_x) > 0:
          plt.scatter(barrels_world_x[::10], barrels_world_y[::10], color='orange', s=5, alpha=0.5, label='Barrels (Static)')
          
-    # Cart trajectory
     plt.plot(cart_world_x, cart_world_y, color='green', linewidth=2, label='Golf Cart Path')
     
     plt.xlabel('World X (m)')
     plt.ylabel('World Y (m)')
-    plt.title('Part B: Enhanced BEV (Ego + Cart + Barrels)')
+    plt.title('Part B: Enhanced BEV (World Frame)')
     plt.legend()
     plt.grid(True)
     plt.axis('equal')
     plt.savefig('trajectory_part_b.png')
     print("Saved trajectory_part_b.png")
-    
-    # 2. Animation
+
+    # 2. Animation (Manual - World Frame)
     try:
-        fig, ax = plt.subplots(figsize=(10, 10))
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
         
-        # Elements
-        ego_line, = ax.plot([], [], 'b-', lw=2, label='Ego')
-        ego_pt, = ax.plot([], [], 'bo', markersize=8)
+        print("Starting manual GIF generation for Part B...")
         
-        cart_line, = ax.plot([], [], 'g-', lw=2, label='Cart')
-        cart_pt, = ax.plot([], [], 'go', markersize=8)
+        fig = Figure(figsize=(10, 10))
+        canvas = FigureCanvasAgg(fig)
+        ax = fig.add_subplot(111)
         
-        barrels_scatter = ax.scatter([], [], c='orange', s=10, alpha=0.6, label='Barrels')
+        all_x = list(car_x) + [x for x in cart_world_x if not np.isnan(x)] + [0]
+        all_y = list(car_y) + [y for y in cart_world_y if not np.isnan(y)] + [0]
         
-        light_marker, = ax.plot([0], [0], 'r*', markersize=15, label='TL')
+        xlims = (np.nanmin(all_x) - 10, np.nanmax(all_x) + 10)
+        ylims = (np.nanmin(all_y) - 10, np.nanmax(all_y) + 10)
         
-        # Determine bounds
-        all_x = list(car_x) + [x for x in cart_world_x if not np.isnan(x)]
-        all_y = list(car_y) + [y for y in cart_world_y if not np.isnan(y)]
+        frames_img = []
         
-        ax.set_xlim(np.nanmin(all_x) - 10, np.nanmax(all_x) + 10)
-        ax.set_ylim(np.nanmin(all_y) - 10, np.nanmax(all_y) + 10)
-        ax.set_xlabel('World X (m)')
-        ax.set_ylabel('World Y (m)')
-        ax.set_title('Part B Animation')
-        ax.grid(True)
-        # ax.axis('equal') # sometimes messes up limits in animation
-        ax.legend()
-        
-        def init():
-            ego_line.set_data([], [])
-            ego_pt.set_data([], [])
-            cart_line.set_data([], [])
-            cart_pt.set_data([], [])
-            barrels_scatter.set_offsets(np.empty((0, 2)))
-            return ego_line, ego_pt, cart_line, cart_pt, barrels_scatter
-        
-        def update(frame):
-            # Ego
-            ego_line.set_data(car_x[:frame+1], car_y[:frame+1])
-            ego_pt.set_data([car_x[frame]], [car_y[frame]])
+        for f in range(num_frames):
+            if f % 50 == 0:
+                print(f"Rendering frame {f}/{num_frames}")
+                
+            ax.clear()
+            ax.set_xlim(xlims)
+            ax.set_ylim(ylims)
+            ax.set_xlabel('World X (m)')
+            ax.set_ylabel('World Y (m)')
+            ax.set_title('Part B: World Frame Animation')
+            ax.grid(True)
             
-            # Cart
-            # Handle NaNs in cart path for plotting? Matplotlib handles NaNs by breaking line usually.
-            cart_line.set_data(cart_world_x[:frame+1], cart_world_y[:frame+1])
-            if not np.isnan(cart_world_x[frame]):
-                 cart_pt.set_data([cart_world_x[frame]], [cart_world_y[frame]])
-            else:
-                 cart_pt.set_data([], [])
+            # Plot Static
+            ax.plot([0], [0], 'r*', markersize=15, label='TL')
+            
+            # Plot Ego
+            ax.plot(car_x[:f+1], car_y[:f+1], 'b-', lw=2, label='Ego')
+            ax.plot([car_x[f]], [car_y[f]], 'bo', markersize=8)
+            
+            # Plot Cart
+            ax.plot(cart_world_x[:f+1], cart_world_y[:f+1], 'g-', lw=2, label='Cart')
+            if not np.isnan(cart_world_x[f]):
+                 ax.plot([cart_world_x[f]], [cart_world_y[f]], 'go', markersize=10, label='Cart')
                  
-            # Barrels (Current Frame observation)
-            # To show static map, we could accumulate.
-            # But "BEV Scence" usually implies what's visible or the map built so far.
-            # Let's show "Map so far" for barrels? Or just current? 
-            # Current is less cluttered. Accumulated builds a map. 
-            # Let's try Accumulated for valid points.
-            
-            # Actually, simply showing current detections is safer ensuring they are from valid depths.
-            current_b_vals = barrels_per_frame[frame]
+            # Plot Barrels (Current Frame)
+            current_b_vals = barrels_per_frame[f]
             if len(current_b_vals) > 0:
-                 barrels_scatter.set_offsets(current_b_vals[:, :2])
-            else:
-                 barrels_scatter.set_offsets(np.empty((0, 2)))
-                 
-            return ego_line, ego_pt, cart_line, cart_pt, barrels_scatter
+                 ax.scatter(current_b_vals[:, 0], current_b_vals[:, 1], c='orange', s=10, alpha=0.6, label='Barrels')
             
-        ani = FuncAnimation(fig, update, frames=num_frames, init_func=init, blit=False, interval=50)
-        
-        ani.save('trajectory_part_b.gif', writer='pillow', fps=20)
-        print("Saved trajectory_part_b.gif")
+            if f == 0: ax.legend(loc='upper right')
+            
+            canvas.draw()
+            img = np.asarray(canvas.buffer_rgba()).copy()
+            frames_img.append(Image.fromarray(img))
+            
+        if frames_img:
+            frames_img[0].save('trajectory_part_b.gif', save_all=True, append_images=frames_img[1:], duration=50, loop=0)
+            print("Saved trajectory_part_b.gif manually.")
         
     except Exception as e:
         print(f"Error saving animation: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
