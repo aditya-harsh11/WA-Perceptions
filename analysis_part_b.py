@@ -118,29 +118,40 @@ def main():
                          current_barrels = points[valid_p]
 
                 # --- Golf Cart (White/Beige) ---
-                # It is likely in the center or ahead.
-                # White: R > 200, G > 200, B > 200.
-                # Limit search to center region to avoid sky/road lines?
-                # Sky is blue-ish. Road is grey.
-                # Cart is bright white.
+                # Improved Logic: Filter by 3D position to exclude off-road objects (like the white tent).
+                
                 H, W, _ = img.shape
                 roi_u_min, roi_u_max = int(W*0.3), int(W*0.7)
-                roi_v_min, roi_v_max = int(H*0.4), int(H*0.8) # Ignore sky and immediate bottom
+                roi_v_min, roi_v_max = int(H*0.4), int(H*0.8) 
                 
                 roi = img[roi_v_min:roi_v_max, roi_u_min:roi_u_max]
-                mask_cart = (roi[:,:,0] > 220) & (roi[:,:,1] > 220) & (roi[:,:,2] > 220)
+                mask_cart = (roi[:,:,0] > 160) & (roi[:,:,1] > 160) & (roi[:,:,2] > 160)
                 
-                # Find centroid of white blob
+                # Get all white pixels in ROI
                 ys, xs = np.where(mask_cart)
-                if len(xs) > 50: # Threshold size
-                    c_x = int(np.mean(xs)) + roi_u_min
-                    c_y = int(np.mean(ys)) + roi_v_min
+                
+                if len(xs) > 20: 
+                    # Convert to global coordinates
+                    global_vs = ys + roi_v_min
+                    global_us = xs + roi_u_min
                     
-                    # Lookup depth
-                    if c_y < H and c_x < W:
-                         pt = xyz_map[c_y, c_x, :3]
-                         if not np.isnan(pt[0]) and pt[0] != 0:
-                             current_cart = pt
+                    # Lookup depth for ALL white pixels
+                    points = xyz_map[global_vs, global_us, :3]
+                    
+                    # Filter valid points
+                    valid_mask = (~np.isnan(points[:,0])) & (points[:,0] != 0)
+                    valid_points = points[valid_mask]
+                    
+                    if len(valid_points) > 0:
+                        # Filter by Lateral Position (X in Camera Frame)
+                        # The tent was found at X ~ 30m. The road is roughly centered at 0.
+                        radius = 8.0
+                        road_mask = (np.abs(valid_points[:, 0]) < radius) & (valid_points[:, 2] < 100)
+                        road_points = valid_points[road_mask]
+                        
+                        if len(road_points) > 5:
+                            # Use mean of consistent points
+                            current_cart = np.mean(road_points, axis=0)
 
             except Exception as e:
                 # print(e)

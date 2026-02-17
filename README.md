@@ -22,8 +22,9 @@ This project estimates the ego-vehicle's trajectory and generates a Bird's Eye V
     - **Detection**: Color thresholding for **Orange** pixels in RGB ($R>180, G\in[80,180], B<100$).
     - **Mapping**: Valid pixels are projected to 3D using depth maps and transformed to the World Frame.
 - **Golf Cart (Dynamic)**:
-    - **Detection**: Color thresholding for **White** pixels ($R,G,B > 220$) within the central region of interest.
-    - **Tracking**: The centroid of the largest white blob is tracked frame-by-frame.
+    - **Detection**: Color thresholding for **White** pixels ($R,G,B > 160$) within the central ROI.
+    - **Filtering**: Pixels are filtered by 3D lateral position (within +/- 8m of road center) to reject off-road objects.
+    - **Tracking**: The centroid of the valid 3D point cloud is tracked frame-by-frame.
 
 ## Coordinate System
 - **World Frame**:
