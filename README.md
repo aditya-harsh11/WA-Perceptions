@@ -49,8 +49,8 @@ Extracts the ego-trajectory and generates the base visualization.
 python3 analysis_part_a.py
 ```
 **Outputs:**
-- `trajectory.png`: Static BEV plot of the ego-vehicle path.
-- `trajectory.mp4` / `.gif`: Animation of the vehicle's movement.
+- `trajectory_part_a.png`: Static BEV plot of the ego-vehicle path.
+- `trajectory_part_a.mp4` / `.gif`: Animation of the vehicle's movement.
 
 ### 3. Running Part B (Enhanced)
 Runs the enhanced analysis with object detection.

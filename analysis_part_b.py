@@ -1,3 +1,45 @@
+"""
+INTERVIEW WALKTHROUGH: PART B (Enhanced Object Tracking & Mapping)
+
+STEP 1: Re-establish the "Anchor" (The Trajectory)
+- Just like in Part A, I calculate the car's movement first using the traffic light 
+  as the world origin (0,0). I need to know where the car is at every second 
+  before I can map other objects!
+
+STEP 2: Classical Computer Vision (Color Thresholding vs. AI)
+- Instead of using a heavy AI model (CNN), I use a technique called "Color 
+  Thresholding" because the objects (Orange Barrels, White Cart) have vary 
+  specific, predictable colors.
+- BARRELS: I create a mask where Red > 180, Green is Mid-range, and Blue is low.
+- GOLF CART: I look for very bright White pixels (R,G,B all > 160).
+- WHY? This is mathematically faster and more robust for this specific 
+  controlled environment than a complex neural network.
+
+STEP 3: 3D Point Cloud Projection
+- For every "Orange" or "White" pixel my mask finds, I pull its depth (X, Y, Z) 
+  from the .npz data.
+- This creates a 3D "Point Cloud" of the objects. It's like turning 2D 
+  paint on a screen into a 3D statue in the world.
+
+STEP 4: Spatial Filtering (Rejecting the Noise)
+- In the background, there is a white tent that could be confused with a cart.
+- I implemented a "Lateral Filter." I check the horizontal distance (X) of 
+  every white object. If it's more than 8 meters away from the road center, 
+  I discard it as background noise. This ensures I only track the cart on the road.
+
+STEP 5: Coordinate Frame Transformation (The "Sticky" Map)
+- The raw object points move with the camera. If the car drives 1 meter forward, 
+  the barrel seems to move 1 meter backward. We want them to stay "still" on the map.
+- FORMULA: [Point_in_World] = [Car_Position] + (Rotation_Matrix * [Point_Relative_to_Car]).
+- By adding the car's position, I "anchor" the barrels to the world ground.
+
+STEP 6: Dynamic Object Tracking (The Golf Cart Path)
+- Unlike the barrels (which are static), the golf cart is moving.
+- I find the "Centroid" (the average center point) of the cart's 3D point cloud in 
+  every frame.
+- By connecting these center points over time, I can draw the golf cart's path 
+  simultaneously with the car's own trajectory on the final BEV map.
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt

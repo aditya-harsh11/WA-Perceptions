@@ -1,3 +1,48 @@
+"""
+INTERVIEW WALKTHROUGH: PART A (Ego-Trajectory Estimation)
+
+STEP 1: Load 2D Detection Data (The "Where to look")
+- I start by reading 'bbox_light.csv'. This file contains 2D bounding boxes (x1, y1, x2, y2) 
+  that tell me exactly where the traffic light is located on the image screen for every frame.
+- WHY? We can't use the whole image; we only care about the distance to the traffic 
+  light because it's our static reference point. This CSV gives us the "search area."
+
+STEP 2: Extract 3D Information from Depth Maps (The "Spatial Map")
+- I find the center pixel (u, v) of that bounding box.
+- I then load the matching '.npz' file for that frame. This file is a "Depth Map" 
+  where every pixel (u, v) is mapped to a real-world coordinate (X, Y, Z) in METERS.
+- RESULT: I convert "Pixel #500, #300" into "12.5 meters in front of the car." This 
+  moves us from a flat 2D picture into a 3D physical world.
+
+STEP 3: Handle Sensor Noise (Interpolation)
+- In the real world, sensors glitch or objects get blocked. If the traffic light is 
+  missing for Frame 45, I don't want the car to "disappear" from the map. Ex : blocked by a tree
+- I use 'np.interp' (Linear Interpolation). If I know the car's distance at Frame 44 
+  and Frame 46, I can accurately guess where it was at Frame 45 by drawing a line 
+  between the known points.
+
+STEP 4: Align to a Global Heading (The "Rotation Matrix")
+- Imagine the car starts driving slightly crookedly (at a 15-degree angle). If we 
+  don't fix this, our map will be tilted and confusing.
+- I use 'arctan2' to find that initial tilt angle (theta_0) between the car and the light.
+- I build a 3x3 'Rotation Matrix' (R). This is a math tool that "spins" every single 3D 
+  point. By spinning the whole world by (-theta_0), I "normalize" the map so that 
+  the car starts driving perfectly "Straight Up" along the X-axis of my chart.
+
+STEP 5: The Ego-Motion Formula (Transforming to the World Frame)
+- This is the core logic: In the Camera's view, the CAR is (0,0,0) and the LIGHT is 
+  at (+10 meters).
+- On the World Map, we want the LIGHT to be the center (0,0,0).
+- Therefore, the CAR must be at (-10 meters) relative to the light.
+- LOGIC: [Car_Position_on_Map] = - (Rotation_Matrix * Light_Relative_Position). 
+  We flip the vector and rotate it to find exactly where the car is on the ground.
+
+STEP 6: Bird's Eye View (BEV) Visualization
+- I ignore the "Height" (Z/Y axis) and plot the (X, Y) path on a 2D graph.
+- I use 'matplotlib' to generate a static 'trajectory_part_a.png' and an 
+  animation to show the path being drawn in real-time. This helps verify that 
+  the car's movement looks smooth and physically logical.
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
