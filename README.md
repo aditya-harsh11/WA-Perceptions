@@ -1,5 +1,7 @@
 # Perception Coding Challenge: Ego-Trajectory & BEV Mapping
 
+Challenge : https://github.com/WisconsinAutonomous/Perception-Coding-Challenge
+
 ## Overview
 This project estimates the ego-vehicle's trajectory and generates a Bird's Eye View (BEV) map from a sequence of RGB images and depth maps. The solution is divided into two parts:
 1.  **Part A**: Ego-trajectory estimation using a static traffic light as a reference.
